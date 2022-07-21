@@ -12,7 +12,7 @@ pip install -r requirements.txt
 ```
 3- Download model weights
 ```bash
-gdown -q "1rtZIOYFv5uqzKytYtAr8Nbd5x21S3lvP" --output Archive.zip
+gdown -q "1DRzkngEcXC0nEPG5KLvHIonIavD9WU9_" --output Archive.zip
 unzip -q Archive.zip
 ```
 4- python run.py (will be configured by flask os env later)
