@@ -9,8 +9,11 @@ Two services intergrates mutually by gRPC protocol (currently is HTTP) in 2 diff
 2- Install packages by 
 ```bash
 pip install -r requirements.txt
+```
+3- Download model weights
+```bash
 gdown -q "1rtZIOYFv5uqzKytYtAr8Nbd5x21S3lvP" --output Archive.zip
 unzip -q Archive.zip
 ```
-3- python run.py (will be configured by flask os env later)
+4- python run.py (will be configured by flask os env later)
 
