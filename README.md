@@ -15,26 +15,26 @@ conda activate tessel.core_ai
 pip install gdown
 
 # Anti-spoofing model
-gdown -q "1xWZIAbrXN77KVVsPQvwoZMje7beJp7Ok" --output anti-spoofing-classification.zip
-unzip -q anti-spoofing-classification.zip    
+gdown "1xWZIAbrXN77KVVsPQvwoZMje7beJp7Ok" --output anti-spoofing-classification.zip
+unzip anti-spoofing-classification.zip    
 rm -f -r __MACOSX anti-spoofing-classification.zip
 ```
 ```bash
 # Detection models
-gdown -q "11p5AIvHp0_I_cu0LWPkfQVAfCvvH2h9P" --output detection.zip
-unzip -q detection.zip
+gdown "11p5AIvHp0_I_cu0LWPkfQVAfCvvH2h9P" --output detection.zip
+unzip detection.zip
 rm -f -r __MACOSX detection.zip
 ```
 ```bash
 # Dataset, configuration file for testing API
-gdown -q "10MS39ynZdmACbxIoIFFxtrDd9xmmzHnM" --output test.zip
-unzip -q test.zip
+gdown "10MS39ynZdmACbxIoIFFxtrDd9xmmzHnM" --output test.zip
+unzip test.zip
 rm -f -r __MACOSX test.zip
 ```
 ```bash
 # Postman .json
-gdown -q "1u_D2fXRLPnFtnU_ZZtvA3dfZxqR6VknU" --output postman-collection.zip
-unzip -q postman-collection.zip
+gdown "1u_D2fXRLPnFtnU_ZZtvA3dfZxqR6VknU" --output postman-collection.zip
+unzip -postman-collection.zip
 rm -f -r __MACOSX postman-collection.zip
 ```
 3- Install packages by 
