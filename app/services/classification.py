@@ -1,5 +1,5 @@
 from app.models.classification.timm.inference import Inference
-from app.models.classification.timm.train import train
+from app.models.classification.timm.train import anti_spoofing_trainer
 import yaml
 
 
@@ -10,6 +10,9 @@ class InferenceClassification:
 				 checkpoint_path: str,
 				 model_name: str = "mixnet_s",
 				 num_classes: int = 2):
+		self.model_name = model_name
+		self.num_classes = num_classes
+		self.checkpoint_path = checkpoint_path
 		self.model = Inference(
 			checkpoint_path,
 			model_name=model_name,
@@ -20,27 +23,35 @@ class InferenceClassification:
 	def __call__(self, source):
 		return self.model.run(source=source, batch_size=8)
 
-	# TODO: train model and save its checkpoint, then replace the init model with the already trained model
-	def train(self, dataset, configuration_file):
+	# TODO: train model and save the best checkpoint
+	def train(self, data_set, configuration):
 		"""
 			Train model and save its checkpoint
 
 		Args:
 			dataset (str): path/to/dataset
-			configuration_file (str): path/to/yaml-file
+			configuration (str): path/to/config.yaml
 
 		Returns:
 			the best checkpoint path
 		"""
-		trained_checkpoint_path = train(self.model.model, dataset, configuration_file)
+		with open(configuration, 'r') as f:
+			cfg = yaml.safe_load(f)
 
-		trained_checkpoint_path = 'model_best.pth.tar'  # NOTE: For debug only, delete this line later
+		anti_spoofing_model = anti_spoofing_trainer(model=self.model.model,
+													batch_size=cfg['batch_size'],
+													lr=cfg['lr'],
+													weight_decay=cfg['weight_decay'],
+													momentum=cfg['momentum'])
 
+		best_model_path = anti_spoofing_model.train(data_set, cfg['epochs'], cfg['outpath'])
+
+		# TODO: replace the init model with the already trained model
 		self.model = Inference(
-			trained_checkpoint_path,
-			model_name='mixnet_s',
-			num_classes=2,
+			best_model_path,
+			model_name=self.model_name,
+			num_classes=self.num_classes,
 			no_test_pool=True,
 		)
 
-		return trained_checkpoint_path
+		return best_model_path

@@ -280,7 +280,9 @@ def transform_customized_train_val(
     if isinstance(img_size, (tuple, list)):
         assert len(img_size) == 2
         scale_size = tuple([int(x / crop_pct) for x in img_size])
+        crop_size = img_size
     else:
+        crop_size = (img_size, img_size)
         size = int(math.floor(img_size / crop_pct))
         scale_size = (size, size)
 
@@ -322,7 +324,7 @@ def transform_customized_train_val(
         tfl += [transforms.ColorJitter(*color_jitter)]
 
     if ten_crop:
-        tfl += [transforms.TenCrop(size=(img_size, img_size))]
+        tfl += [transforms.TenCrop(size=crop_size)]
         if use_prefetcher:
             # prefetcher and collate will handle tensor conversion and norm
             tfl += [transforms.Lambda(lambda crops: [ToNumpy()(crop) for crop in crops])]
@@ -336,7 +338,7 @@ def transform_customized_train_val(
             #     tfl += [
             #         RandomErasing(re_prob, mode=re_mode, max_count=re_count, num_splits=re_num_splits, device='cpu')]
     else:
-        tfl += [transforms.CenterCrop(size=(img_size, img_size))]
+        tfl += [transforms.CenterCrop(size=crop_size)]
         if use_prefetcher:
             # prefetcher and collate will handle tensor conversion and norm
             tfl += [ToNumpy()]
@@ -374,9 +376,11 @@ def transform_customized_inference(
     if isinstance(img_size, (tuple, list)):
         assert len(img_size) == 2
         scale_size = tuple([int(x / crop_pct) for x in img_size])
+        crop_size = img_size
     else:
         size = int(math.floor(img_size / crop_pct))
         scale_size = (size, size)
+        crop_size = (img_size, img_size)
 
     tfl = [transforms.Resize(size=scale_size, interpolation=str_to_interp_mode(interpolation))]
 
@@ -415,7 +419,7 @@ def transform_customized_inference(
             color_jitter = (float(color_jitter),) * 3
         tfl += [transforms.ColorJitter(*color_jitter)]
 
-    tfl += [transforms.CenterCrop(size=(img_size, img_size))]
+    tfl += [transforms.CenterCrop(size=crop_size)]
 
     if use_prefetcher:
         # prefetcher and collate will handle tensor conversion and norm

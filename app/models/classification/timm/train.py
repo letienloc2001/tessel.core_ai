@@ -29,7 +29,7 @@ import torchvision.utils
 from torch.nn.parallel import DistributedDataParallel as NativeDDP
 
 from timm.data import create_dataset, create_loader, resolve_data_config, Mixup, FastCollateMixup, AugMixDataset
-from timm.models import create_model, safe_model_name, resume_checkpoint, load_checkpoint,\
+from timm.models import create_model, safe_model_name, resume_checkpoint, load_checkpoint, \
     convert_splitbn_model, model_parameters
 from timm import utils
 from timm.loss import JsdCrossEntropy, SoftTargetCrossEntropy, BinaryCrossEntropy, LabelSmoothingCrossEntropy
@@ -41,6 +41,7 @@ try:
     from apex import amp
     from apex.parallel import DistributedDataParallel as ApexDDP
     from apex.parallel import convert_syncbn_model
+
     has_apex = True
 except ImportError:
     has_apex = False
@@ -54,16 +55,17 @@ except AttributeError:
 
 try:
     import wandb
+
     has_wandb = True
 except ImportError:
     has_wandb = False
 
 try:
     from functorch.compile import memory_efficient_fusion
+
     has_functorch = True
 except ImportError as e:
     has_functorch = False
-
 
 torch.backends.cudnn.benchmark = True
 _logger = logging.getLogger('train')
@@ -127,7 +129,7 @@ def _parse_args(dataset, configuration):
                        help='Use channels_last memory layout')
     scripting_group = group.add_mutually_exclusive_group()
     scripting_group.add_argument('--torchscript', dest='torchscript', action='store_true', default=False,
-                                 help = 'torch.jit.script the full model')
+                                 help='torch.jit.script the full model')
     scripting_group.add_argument('--aot-autograd', default=False, action='store_true',
                                  help="Enable AOT Autograd support. (It's recommended to use this option with `--fuser nvfuser` together)")
     group.add_argument('--fuser', default='', type=str,
@@ -209,17 +211,17 @@ def _parse_args(dataset, configuration):
     group.add_argument('--color-jitter', type=float, default=None, metavar='PCT',
                        help='Color jitter factor (default: None)')
     group.add_argument('--aa', type=str, default=None, metavar='NAME',
-                        help='Use AutoAugment policy. "v0" or "original". (default: None)'),
+                       help='Use AutoAugment policy. "v0" or "original". (default: None)'),
     group.add_argument('--aug-repeats', type=float, default=0,
-                        help='Number of augmentation repetitions (distributed training only) (default: 0)')
+                       help='Number of augmentation repetitions (distributed training only) (default: 0)')
     group.add_argument('--aug-splits', type=int, default=0,
                        help='Number of augmentation splits (default: 0, valid: 0 or >=2)')
     group.add_argument('--jsd-loss', action='store_true', default=False,
-                        help='Enable Jensen-Shannon Divergence + CE loss. Use with `--aug-splits`.')
+                       help='Enable Jensen-Shannon Divergence + CE loss. Use with `--aug-splits`.')
     group.add_argument('--bce-loss', action='store_true', default=False,
-                        help='Enable BCE loss w/ Mixup/CutMix use.')
+                       help='Enable BCE loss w/ Mixup/CutMix use.')
     group.add_argument('--bce-target-thresh', type=float, default=None,
-                        help='Threshold for binarizing softened BCE targets (default: None, disabled)')
+                       help='Threshold for binarizing softened BCE targets (default: None, disabled)')
     group.add_argument('--reprob', type=float, default=0., metavar='PCT',
                        help='Random erase prob (default: 0.)')
     group.add_argument('--remode', type=str, default='pixel',
@@ -235,15 +237,15 @@ def _parse_args(dataset, configuration):
     group.add_argument('--cutmix-minmax', type=float, nargs='+', default=None,
                        help='cutmix min/max ratio, overrides alpha and enables cutmix if set (default: None)')
     group.add_argument('--mixup-prob', type=float, default=1.0,
-                        help='Probability of performing mixup or cutmix when either/both is enabled')
+                       help='Probability of performing mixup or cutmix when either/both is enabled')
     group.add_argument('--mixup-switch-prob', type=float, default=0.5,
-                        help='Probability of switching to cutmix when both mixup and cutmix enabled')
+                       help='Probability of switching to cutmix when both mixup and cutmix enabled')
     group.add_argument('--mixup-mode', type=str, default='batch',
-                        help='How to apply mixup/cutmix params. Per "batch", "pair", or "elem"')
+                       help='How to apply mixup/cutmix params. Per "batch", "pair", or "elem"')
     group.add_argument('--mixup-off-epoch', default=0, type=int, metavar='N',
-                        help='Turn off mixup after this epoch, disabled if 0 (default: 0)')
+                       help='Turn off mixup after this epoch, disabled if 0 (default: 0)')
     group.add_argument('--smoothing', type=float, default=None,
-                        help='Label smoothing (default: None)')
+                       help='Label smoothing (default: None)')
     group.add_argument('--train-interpolation', type=str, default='bilinear',
                        help='Training interpolation (random, bilinear, bicubic default: "random")')
     group.add_argument('--drop', type=float, default=0.0, metavar='PCT',
@@ -282,15 +284,15 @@ def _parse_args(dataset, configuration):
     group.add_argument('--seed', type=int, default=42, metavar='S',
                        help='random seed (default: 42)')
     group.add_argument('--worker-seeding', type=str, default='all',
-                        help='worker seed mode (default: all)')
+                       help='worker seed mode (default: all)')
     group.add_argument('--log-interval', type=int, default=50, metavar='N',
-                        help='how many batches to wait before logging training status')
+                       help='how many batches to wait before logging training status')
     group.add_argument('--recovery-interval', type=int, default=0, metavar='N',
-                        help='how many batches to wait before writing recovery checkpoint')
+                       help='how many batches to wait before writing recovery checkpoint')
     group.add_argument('--checkpoint-hist', type=int, default=10, metavar='N',
-                        help='number of checkpoints to keep (default: 10)')
+                       help='number of checkpoints to keep (default: 10)')
     group.add_argument('-j', '--workers', type=int, default=4, metavar='N',
-                        help='how many training processes to use (default: 4)')
+                       help='how many training processes to use (default: 4)')
     group.add_argument('--save-images', action='store_true', default=False,
                        help='save images of input bathes every log interval for debugging')
     group.add_argument('--amp', action='store_true', default=False,
@@ -478,7 +480,6 @@ def train(model, dataset, configuration):
         if args.local_rank == 0:
             _logger.info('AMP not enabled. Training in float32.')
 
-
     # optionally resume from a checkpoint
     resume_epoch = None
     if args.resume:
@@ -508,7 +509,7 @@ def train(model, dataset, configuration):
             if args.local_rank == 0:
                 _logger.info("Using native Torch DistributedDataParallel.")
             model = NativeDDP(model, device_ids=[args.local_rank], broadcast_buffers=not args.no_ddp_bb)
-        # NOTE: EMA model does not need to be wrapped by DDP
+    # NOTE: EMA model does not need to be wrapped by DDP
     # END NOTE
 
     # setup learning rate schedule and starting epoch
@@ -727,7 +728,6 @@ def train_one_epoch(
         epoch, model, loader, optimizer, loss_fn, args, ten_crop=False,
         lr_scheduler=None, saver=None, output_dir=None, amp_autocast=suppress,
         loss_scaler=None, model_ema=None, mixup_fn=None):
-
     if args.mixup_off_epoch and epoch >= args.mixup_off_epoch:
         if args.prefetcher and loader.mixup_enabled:
             loader.mixup_enabled = False
@@ -738,50 +738,125 @@ def train_one_epoch(
     batch_time_m = utils.AverageMeter()
     data_time_m = utils.AverageMeter()
     losses_m = utils.AverageMeter()
+    loss = None
 
     model.train()
 
     end = time.time()
-    last_idx = len(loader) - 1
-    num_updates = epoch * len(loader)
+    last_idx = len(loader) * (10 if args.ten_crop else 1) - 1
+    num_updates = epoch * len(loader) * (10 if args.ten_crop else 1)
     for batch_idx, (input, target) in enumerate(loader):
-        # input (batchsize
         last_batch = batch_idx == last_idx
         data_time_m.update(time.time() - end)
-        if not args.prefetcher:
-            input, target = input.cuda(), target.cuda()
-            if mixup_fn is not None:
-                input, target = mixup_fn(input, target)
-        if args.channels_last:
-            input = input.contiguous(memory_format=torch.channels_last)
+        if args.ten_crop:  # todo: use ten crop augmentation
 
-        with amp_autocast():
-            output = model(input)
-            loss = loss_fn(output, target)
+            # BEFORE
+            # input.shape  = batch_size, 10, (3,400,400)
+            # target.shape = batch_size
+            input = torch.flatten(input, start_dim=0, end_dim=1)
+            target = torch.Tensor([entry for entry in target for _ in range(10)])
+            # AFTER
+            # input.shape  = 10xbatch_size, (3,400,400)
+            # target.shape = 10xbatch_size
 
-        if not args.distributed:
-            losses_m.update(loss.item(), input.size(0))
+            for crop_idx in range(10):
+                start_idx = args.batch_size * crop_idx
+                end_idx = start_idx + args.batch_size
+                crop_input = input[start_idx: end_idx:]
+                crop_target = target[start_idx: end_idx:]
+                # CROP
+                # crop_input.shape  = batch_size, (3,400,400)
+                # crop_target.shape = batch_size
 
-        optimizer.zero_grad()
-        if loss_scaler is not None:
-            loss_scaler(
-                loss, optimizer,
-                clip_grad=args.clip_grad, clip_mode=args.clip_mode,
-                parameters=model_parameters(model, exclude_head='agc' in args.clip_mode),
-                create_graph=second_order)
-        else:
-            loss.backward(create_graph=second_order)
-            if args.clip_grad is not None:
-                utils.dispatch_clip_grad(
-                    model_parameters(model, exclude_head='agc' in args.clip_mode),
-                    value=args.clip_grad, mode=args.clip_mode)
-            optimizer.step()
+                if not args.prefetcher:
+                    crop_input, crop_target = crop_input.cuda(), crop_target.cuda()
+                    if mixup_fn is not None:
+                        crop_input, crop_target = mixup_fn(crop_input, crop_target)
+                if args.channels_last:
+                    crop_input = crop_input.contiguous(memory_format=torch.channels_last)
 
-        if model_ema is not None:
-            model_ema.update(model)
+                with amp_autocast():
+                    output = model(crop_input)
+                    loss = loss_fn(output, crop_target)
 
-        torch.cuda.synchronize()
-        num_updates += 1
+                if not args.distributed:
+                    losses_m.update(loss.item(), crop_input.size(0))
+
+                optimizer.zero_grad()
+
+                # NOTE: DON'T USE BY DEFAULT
+                if loss_scaler is not None:
+                    loss_scaler(
+                        loss, optimizer,
+                        clip_grad=args.clip_grad, clip_mode=args.clip_mode,
+                        parameters=model_parameters(model, exclude_head='agc' in args.clip_mode),
+                        create_graph=second_order)
+                # END NOTE:
+
+                else:
+                    loss.backward(create_graph=second_order)
+
+                    # NOTE: DON'T USE BY DEFAULT
+                    if args.clip_grad is not None:
+                        utils.dispatch_clip_grad(
+                            model_parameters(model, exclude_head='agc' in args.clip_mode),
+                            value=args.clip_grad, mode=args.clip_mode)
+                    # END NOTE:
+
+                    optimizer.step()
+
+                # NOTE: DON'T USE BY DEFAULT
+                if model_ema is not None:
+                    model_ema.update(model)
+                # END NOTE:
+
+                torch.cuda.synchronize()
+                num_updates += 1
+
+        else:  # todo: no ten crop augmentation
+            # input.shape  = batch_size x (3,400,400)
+            # target.shape = batch_size
+            if not args.prefetcher:
+                input, target = input.cuda(), target.cuda()
+                if mixup_fn is not None:
+                    input, target = mixup_fn(input, target)
+            if args.channels_last:
+                input = input.contiguous(memory_format=torch.channels_last)
+
+            with amp_autocast():
+                output = model(input)
+                loss = loss_fn(output, target)
+
+            if not args.distributed:
+                losses_m.update(loss.item(), input.size(0))
+
+            optimizer.zero_grad()
+            # NOTE: DON'T USE BY DEFAULT
+            if loss_scaler is not None:
+                loss_scaler(
+                    loss, optimizer,
+                    clip_grad=args.clip_grad, clip_mode=args.clip_mode,
+                    parameters=model_parameters(model, exclude_head='agc' in args.clip_mode),
+                    create_graph=second_order)
+            # END NOTE:
+            else:
+                loss.backward(create_graph=second_order)
+                # NOTE: DON'T USE BY DEFAULT
+                if args.clip_grad is not None:
+                    utils.dispatch_clip_grad(
+                        model_parameters(model, exclude_head='agc' in args.clip_mode),
+                        value=args.clip_grad, mode=args.clip_mode)
+                # END NOTE:
+                optimizer.step()
+
+            # NOTE: DON'T USE BY DEFAULT
+            if model_ema is not None:
+                model_ema.update(model)
+            # END NOTE:
+
+            torch.cuda.synchronize()
+            num_updates += 1
+
         batch_time_m.update(time.time() - end)
         if last_batch or batch_idx % args.log_interval == 0:
             lrl = [param_group['lr'] for param_group in optimizer.param_groups]
@@ -824,7 +899,7 @@ def train_one_epoch(
             lr_scheduler.step_update(num_updates=num_updates, metric=losses_m.avg)
 
         end = time.time()
-        # end for
+    # end for
 
     if hasattr(optimizer, 'sync_lookahead'):
         optimizer.sync_lookahead()
@@ -837,46 +912,104 @@ def validate(model, loader, loss_fn, args, ten_crop=False, amp_autocast=suppress
     losses_m = utils.AverageMeter()
     top1_m = utils.AverageMeter()
     top5_m = utils.AverageMeter()
+    loss = None
 
     model.eval()
 
     end = time.time()
-    last_idx = len(loader) - 1
+    last_idx = len(loader) * (10 if args.ten_crop else 1) - 1
     with torch.no_grad():
         for batch_idx, (input, target) in enumerate(loader):
             last_batch = batch_idx == last_idx
-            if not args.prefetcher:
-                input = input.cuda()
-                target = target.cuda()
-            if args.channels_last:
-                input = input.contiguous(memory_format=torch.channels_last)
+            if args.ten_crop:  # todo: use ten crop augmentation
+                # BEFORE
+                # input.shape  = batch_size, 10, (3,400,400)
+                # target.shape = batch_size
+                input = torch.flatten(input, start_dim=0, end_dim=1)
+                target = torch.Tensor([entry for entry in target for _ in range(10)])
+                # AFTER
+                # input.shape  = 10xbatch_size, (3,400,400)
+                # target.shape = 10xbatch_size
+                for crop_idx in range(10):
+                    start_idx = args.batch_size * crop_idx
+                    end_idx = start_idx + args.batch_size
+                    crop_input = input[start_idx: end_idx:]
+                    crop_target = target[start_idx: end_idx:]
+                    # CROP
+                    # crop_input.shape  = batch_size, (3,400,400)
+                    # crop_target.shape = batch_size
+                    if not args.prefetcher:
+                        crop_input = crop_input.cuda()
+                        crop_target = crop_target.cuda()
+                    if args.channels_last:
+                        crop_input = crop_input.contiguous(memory_format=torch.channels_last)
 
-            with amp_autocast():
-                output = model(input)
-            if isinstance(output, (tuple, list)):
-                output = output[0]
+                    with amp_autocast():
+                        output = model(crop_input)
+                    if isinstance(output, (tuple, list)):
+                        output = output[0]
 
-            # augmentation reduction
-            reduce_factor = args.tta
-            if reduce_factor > 1:
-                output = output.unfold(0, reduce_factor, reduce_factor).mean(dim=2)
-                target = target[0:target.size(0):reduce_factor]
+                    # NOTE: DON'T USE BY DEFAULT
+                    # augmentation reduction
+                    reduce_factor = args.tta
+                    if reduce_factor > 1:
+                        output = output.unfold(0, reduce_factor, reduce_factor).mean(dim=2)
+                        crop_target = crop_target[0:crop_target.size(0):reduce_factor]
+                    # END NOTE
 
-            loss = loss_fn(output, target)
-            acc1, acc5 = utils.accuracy(output, target, topk=(1, 5))
+                    loss = loss_fn(output, crop_target)
+                    acc1, acc5 = utils.accuracy(output, crop_target, topk=(1, 5))
 
-            if args.distributed:
-                reduced_loss = utils.reduce_tensor(loss.data, args.world_size)
-                acc1 = utils.reduce_tensor(acc1, args.world_size)
-                acc5 = utils.reduce_tensor(acc5, args.world_size)
-            else:
-                reduced_loss = loss.data
+                    if args.distributed:
+                        reduced_loss = utils.reduce_tensor(loss.data, args.world_size)
+                        acc1 = utils.reduce_tensor(acc1, args.world_size)
+                        acc5 = utils.reduce_tensor(acc5, args.world_size)
+                    else:
+                        reduced_loss = loss.data
 
-            torch.cuda.synchronize()
+                    torch.cuda.synchronize()
 
-            losses_m.update(reduced_loss.item(), input.size(0))
-            top1_m.update(acc1.item(), output.size(0))
-            top5_m.update(acc5.item(), output.size(0))
+                    losses_m.update(reduced_loss.item(), crop_input.size(0))
+                    top1_m.update(acc1.item(), output.size(0))
+                    top5_m.update(acc5.item(), output.size(0))
+
+            else:  # todo: no ten crop augumentation
+                # input.shape  = batch_size x (3,400,400)
+                # target.shape = batch_size
+                if not args.prefetcher:
+                    input = input.cuda()
+                    target = target.cuda()
+                if args.channels_last:
+                    input = input.contiguous(memory_format=torch.channels_last)
+
+                with amp_autocast():
+                    output = model(input)
+                if isinstance(output, (tuple, list)):
+                    output = output[0]
+
+                # NOTE: DON'T USE BY DEFAULT
+                # augmentation reduction
+                reduce_factor = args.tta
+                if reduce_factor > 1:
+                    output = output.unfold(0, reduce_factor, reduce_factor).mean(dim=2)
+                    target = target[0:target.size(0):reduce_factor]
+                # END NOTE
+
+                loss = loss_fn(output, target)
+                acc1, acc5 = utils.accuracy(output, target, topk=(1, 5))
+
+                if args.distributed:
+                    reduced_loss = utils.reduce_tensor(loss.data, args.world_size)
+                    acc1 = utils.reduce_tensor(acc1, args.world_size)
+                    acc5 = utils.reduce_tensor(acc5, args.world_size)
+                else:
+                    reduced_loss = loss.data
+
+                torch.cuda.synchronize()
+
+                losses_m.update(reduced_loss.item(), input.size(0))
+                top1_m.update(acc1.item(), output.size(0))
+                top5_m.update(acc5.item(), output.size(0))
 
             batch_time_m.update(time.time() - end)
             end = time.time()
@@ -896,11 +1029,152 @@ def validate(model, loader, loss_fn, args, ten_crop=False, amp_autocast=suppress
     return metrics
 
 
-def main():
-    model = create_model(model_name='mixnet_s', pretrained=True, checkpoint_path='', num_classes=2)
-    train(model, dataset='/Users/letienloc/Desktop/tessel.core_ai/test',
-          configuration='/Users/letienloc/Desktop/tessel.core_ai/test/anti-spoofing.yaml')
+# def main():
+# 	model = create_model(model_name='mixnet_s', pretrained=True, checkpoint_path='', num_classes=2)
+# 	train(model, dataset='/Users/letienloc/Desktop/tessel.core_ai/test',
+# 		  configuration='/Users/letienloc/Desktop/tessel.core_ai/test/anti-spoofing.yaml')
+#
+#
+# if __name__ == '__main__':
+# 	main()
+
+from torchvision import transforms as t
+from timm import create_model
+from numpy import inf
 
 
-if __name__ == '__main__':
-    main()
+class anti_spoofing_trainer:
+    def __init__(self,
+                 model = None,
+                 batch_size: int = 8,
+                 lr: float = 0.001,
+                 weight_decay: float = 0.0001,
+                 momentum: float = 0.9):
+        """
+        Load the model weights and configure images transformer & device
+
+        Args:
+            model: timm model object
+            batch_size (int): batch size (default: 8)
+            lr (float): learning rate (default: 0.001)
+            weight_decay (float): weight decay (default: 0.0001)
+            momentum (float): momentum (default: 0.9)
+        """
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.batch_size = batch_size
+        self.num_crops = 10
+        self.transform = t.Compose([
+            t.Resize(size=(400, 400)),
+            t.TenCrop(size=(224, 224)),
+            t.Lambda(lambda crops: [t.ToTensor()(crop) for crop in crops]),
+            t.Lambda(lambda crops: [t.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))(crop) for crop in crops]),
+            t.Lambda(lambda crops: torch.stack(crops))
+        ])
+        self.model = torch.nn.Sequential(model, torch.nn.Softmax(dim=1))
+        self.model.to(self.device)
+        self.optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()), lr=lr, weight_decay=weight_decay, momentum=momentum)
+        self.criterion = torch.nn.CrossEntropyLoss()
+
+    def train(self, data_set: str, num_epochs: int, best_model_path: str = 'mixnet_s-anti-spoofing.pth'):
+        """
+        Train model
+
+        Args:
+            data_set (str): path/to/dataset
+            num_epochs (int): number of epochs to train
+            best_model_path (str): path/to/output_checkpoint_file
+
+        Return:
+            the best model path
+        """
+        # TODO: CREATE LOADERS
+        TRAIN_SET = os.path.join(data_set, 'train')
+        VAL_SET = os.path.join(data_set, 'validation')
+
+        train_dataset = torchvision.datasets.ImageFolder(root=TRAIN_SET, transform=self.transform)
+        val_dataset = torchvision.datasets.ImageFolder(root=VAL_SET, transform=self.transform)
+
+        train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=self.batch_size, shuffle=True)
+        val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=self.batch_size, shuffle=True)
+
+
+        print('🚀 START TRAINING ...')
+        min_valid_loss = inf
+        train_loss_vals = []
+        val_loss_vals = []
+        train_accu_vals = []
+        val_accu_vals = []
+        for epoch in range(num_epochs):
+            print(f'\nEpoch {epoch + 1}/{num_epochs}: ')
+
+            # TODO: TRAINING LOOP
+            train_loss = 0.0
+            correct = 0
+            total = 0
+            train_epoch_loss = []
+            self.model.train()
+            for i, (images, labels) in enumerate(train_loader):
+                count = 100 * i / len(train_loader)
+                print('\r', end='')
+                print('|' + ('=' * int(count / 2)) + '>' + (' ' * (50 - int(count / 2)) + '| ' + f'{count:.2f} %'), end='')
+                crop_list = images.tolist()
+                for crop_idx in range(self.num_crops):
+                    cropped_images = torch.Tensor([crop_list[batch_idx][crop_idx] for batch_idx in range(images.size(0))])
+
+                    cropped_images, labels = cropped_images.to(self.device), labels.to(self.device)
+
+                    self.optimizer.zero_grad()
+                    outputs = self.model(cropped_images)
+                    _, predictions = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predictions == labels).sum().item()
+
+                    loss = self.criterion(outputs, labels)
+                    loss.backward()
+                    train_epoch_loss.append(loss.item())
+                    self.optimizer.step()
+                    train_loss += loss.item()
+
+            print('\r', end='')
+            print(f'- Training Accuracy  : {100 * correct / total:.2f} %, Training Loss  : {train_loss / (len(train_loader) * self.num_crops):.5f}')
+            train_loss_vals.append(sum(train_epoch_loss) / len(train_epoch_loss))
+            train_accu_vals.append(100 * correct / total)
+
+            # TODO: VALIDATION LOOP
+            valid_loss = 0.0
+            correct = 0
+            total = 0
+            val_epoch_loss = []
+            self.model.eval()
+            for i, (images, labels) in enumerate(val_loader):
+                count = 100 * i / len(val_loader)
+                print('\r', end='')
+                print('|' + ('=' * int(count / 2)) + '>' + (' ' * (50 - int(count / 2)) + '| ' + f'{count:.2f} %'), end='')
+                crop_list = images.tolist()
+                for crop_idx in range(self.num_crops):
+                    cropped_images = torch.Tensor([crop_list[batch_idx][crop_idx] for batch_idx in range(images.size(0))])
+                    cropped_images, labels = cropped_images.to(self.device), labels.to(self.device)
+
+                    outputs = self.model(cropped_images)
+
+                    _, predictions = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predictions == labels).sum().item()
+
+                    loss = self.criterion(outputs, labels)
+                    val_epoch_loss.append(loss.item())
+                    valid_loss += loss.item()
+
+            print('\r', end='')
+            print(f'- Validation Accuracy: {100 * correct / total:.2f} %, Validation Loss: {valid_loss / (len(val_loader) * self.num_crops):.5f}')
+            val_loss_vals.append(sum(val_epoch_loss) / len(val_epoch_loss))
+            val_accu_vals.append(100 * correct / total)
+
+            # TODO: SAVE MODEL CHECKPOINT, EXCEPT THE LAST SOFTMAX LAYER
+            if min_valid_loss > valid_loss:
+                print(f'🎯 CHECKPOINT: Validation Loss ({min_valid_loss / (len(val_loader) * self.num_crops):.5f} ==> {valid_loss / (len(val_loader) * self.num_crops):.5f})')
+                min_valid_loss = valid_loss
+                mixnet_s, softmax = self.model.children()
+                torch.save(mixnet_s.state_dict(), best_model_path)
+
+        return best_model_path

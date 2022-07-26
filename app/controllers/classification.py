@@ -44,7 +44,6 @@ def verify_anti_spoofing_image() -> Response:
         mimetype='application/json',
     )
 
-
 @classification_bp.route("/train_anti_spoofing", methods=["POST"])
 def train_anti_spoofing() -> Response:
     """
@@ -67,10 +66,10 @@ def train_anti_spoofing() -> Response:
     data_set = input_json['dataset']
     configuration = input_json['configuration']
 
-    current_app.models["ANTI_SPOOFING_CLASSIFICATION"].train(data_set, configuration)
+    trained_model_path = current_app.models["ANTI_SPOOFING_CLASSIFICATION"].train(data_set, configuration)
 
     return current_app.response_class(
-        response={'🚀 Training Completed.'},
+        response={f'🚀 Training Completed. Best checkpoint at: "{trained_model_path}"'},
         status=200,
         mimetype='application/json',
     )

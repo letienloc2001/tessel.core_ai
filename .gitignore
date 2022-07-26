@@ -365,6 +365,5 @@ output/
 *.pth
 *.pt
 *.gz
-*.pth.tar
-test.py
+app/models/classification/timm/test.py
 Testing notebook.ipynb
