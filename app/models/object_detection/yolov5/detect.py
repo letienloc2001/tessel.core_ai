@@ -17,6 +17,7 @@ from utils.dataloaders import IMG_FORMATS, LoadBase64Images, LoadImages
 from utils.general import (check_file, check_img_size,
                            non_max_suppression, scale_coords, strip_optimizer)
 from utils.torch_utils import select_device, time_sync
+from typing import List, Set, Dict, Tuple, Optional
 
 
 class Inference:
@@ -36,7 +37,7 @@ class Inference:
     def run(
             self,
             source,
-            imgsz: tuple[int, int] = (640, 640),
+            imgsz: Tuple[int, int] = (640, 640),
             conf_thres: float = 0.25,
             iou_thres: float = 0.45,
             max_det: int = 1000,
