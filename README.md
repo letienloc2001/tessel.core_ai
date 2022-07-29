@@ -8,10 +8,6 @@ Two services intergrates mutually by gRPC protocol (currently is HTTP) in 2 diff
 
 1- Create env by conda, docker or virtual env.
 
-```bash
-cd tessel.core_ai
-conda activate tessel.core_ai
-```
 
 2- Download some necessary stuffs: [here](https://drive.google.com/drive/folders/1Rd5HVlbnOxxxgZai2BUcIyCAjLpIzoYk?usp=sharing)
 

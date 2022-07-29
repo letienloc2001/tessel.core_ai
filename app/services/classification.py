@@ -1,5 +1,5 @@
-from app.models.classification.timm.inference import Inference
-from app.models.classification.timm.train import anti_spoofing_trainer
+from tessel.app.models.classification.timm.inference import Inference
+from tessel.app.models.classification.timm.train import anti_spoofing_trainer
 import yaml
 
 

@@ -1,6 +1,5 @@
 """ Transforms Factory
 Factory methods for building image transforms for use with TIMM (PyTorch Image Models)
-
 Hacked together by / Copyright 2019, Ross Wightman
 """
 import math
@@ -8,10 +7,10 @@ import math
 import torch
 from torchvision import transforms
 
-from .constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, DEFAULT_CROP_PCT
-from .auto_augment import rand_augment_transform, augment_and_mix_transform, auto_augment_transform
-from .transforms import str_to_interp_mode, str_to_pil_interp, RandomResizedCropAndInterpolation, ToNumpy
-from .random_erasing import RandomErasing
+from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, DEFAULT_CROP_PCT
+from timm.data.auto_augment import rand_augment_transform, augment_and_mix_transform, auto_augment_transform
+from timm.data.transforms import str_to_interp_mode, str_to_pil_interp, RandomResizedCropAndInterpolation, ToNumpy
+from timm.data.random_erasing import RandomErasing
 
 
 def transforms_noaug_train(
@@ -161,213 +160,16 @@ def transforms_imagenet_eval(
 
     return transforms.Compose(tfl)
 
-
-def create_transform(
-        input_size,
-        mode='inference',
-        use_prefetcher=False,
-        no_aug=False,
-        scale=None,
-        ratio=None,
-        hflip=0.,
-        vflip=0.,
-        ten_crop=False,
-        color_jitter=0.4,
-        auto_augment=None,
-        interpolation='bilinear',
-        mean=IMAGENET_DEFAULT_MEAN,
-        std=IMAGENET_DEFAULT_STD,
-        re_prob=0.,
-        re_mode='const',
-        re_count=1,
-        re_num_splits=0,
-        crop_pct=None,
-        tf_preprocessing=False,
-        separate=False):
-
-    if isinstance(input_size, (tuple, list)):
-        img_size = input_size[-2:]
-    else:
-        img_size = input_size
-
-    if tf_preprocessing and use_prefetcher:
-        assert not separate, "Separate transforms not supported for TF preprocessing"
-        from tf_preprocessing import TfPreprocessTransform
-        is_training = (mode == 'train')
-        transform = TfPreprocessTransform(
-            is_training=is_training, size=img_size, interpolation=interpolation)
-    else:
-        if no_aug:  # Todo: Use imagenet transform if there's no aug
-            if mode == 'train':  # Todo: use for train set
-                transform = transforms_imagenet_train(
-                    img_size,
-                    scale=scale,
-                    ratio=ratio,
-                    hflip=hflip,
-                    vflip=vflip,
-                    color_jitter=color_jitter,
-                    auto_augment=auto_augment,
-                    interpolation=interpolation,
-                    use_prefetcher=use_prefetcher,
-                    mean=mean,
-                    std=std,
-                    re_prob=re_prob,
-                    re_mode=re_mode,
-                    re_count=re_count,
-                    re_num_splits=re_num_splits,
-                    separate=separate)
-            else:  # Todo: Use for val and inference set
-                # assert not separate, "Separate transforms not supported for validation preprocessing"
-                transform = transforms_imagenet_eval(
-                    img_size,
-                    interpolation=interpolation,
-                    use_prefetcher=use_prefetcher,
-                    mean=mean,
-                    std=std,
-                    crop_pct=crop_pct)
-        else:    # Todo: Use customized transform
-            if mode == 'inference':  # Todo: use for test set
-                # assert not separate, "Cannot perform split augmentation with no_aug"
-                transform = transform_customized_inference(
-                    img_size=img_size,
-                    hflip=hflip,
-                    vflip=vflip,
-                    color_jitter=color_jitter,
-                    auto_augment=auto_augment,
-                    interpolation=interpolation,
-                    use_prefetcher=use_prefetcher,
-                    mean=mean,
-                    std=std,
-                    crop_pct=crop_pct,
-                )
-            else:  # Todo: use for train and val set
-                transform = transform_customized_train_val(
-                    img_size=img_size,
-                    hflip=hflip,
-                    vflip=vflip,
-                    color_jitter=color_jitter,
-                    auto_augment=auto_augment,
-                    ten_crop=ten_crop,
-                    interpolation=interpolation,
-                    use_prefetcher=use_prefetcher,
-                    mean=mean,
-                    std=std,
-                    crop_pct=crop_pct,
-                )
-
-    return transform
-
-def transform_customized_train_val(
-        img_size=400,
-        hflip=None,
-        vflip=None,
-        color_jitter=None,
-        auto_augment=None,
-        ten_crop=True,
-        interpolation='bilinear',
-        use_prefetcher=False,
-        mean=IMAGENET_DEFAULT_MEAN,
-        std=IMAGENET_DEFAULT_STD,
-        # re_prob=0.,
-        # re_mode='const',
-        # re_count=1,
-        # re_num_splits=0,
-        crop_pct=0.4,
-):
-    if interpolation == 'random':
-        interpolation = 'bilinear'
-
-    if isinstance(img_size, (tuple, list)):
-        assert len(img_size) == 2
-        scale_size = tuple([int(x / crop_pct) for x in img_size])
-        crop_size = img_size
-    else:
-        crop_size = (img_size, img_size)
-        size = int(math.floor(img_size / crop_pct))
-        scale_size = (size, size)
-
-    tfl = [transforms.Resize(size=scale_size, interpolation=str_to_interp_mode(interpolation))]
-
-    if hflip > 0.:
-        tfl += [transforms.RandomHorizontalFlip(p=hflip)]
-    if vflip > 0.:
-        tfl += [transforms.RandomVerticalFlip(p=vflip)]
-
-    if auto_augment:
-        assert isinstance(auto_augment, str)
-        if isinstance(img_size, (tuple, list)):
-            img_size_min = min(img_size)
-        else:
-            img_size_min = img_size
-        aa_params = dict(
-            translate_const=int(img_size_min * 0.45),
-            img_mean=tuple([min(255, round(255 * x)) for x in mean]),
-        )
-        if interpolation and interpolation != 'random':
-            aa_params['interpolation'] = str_to_pil_interp(interpolation)
-        if auto_augment.startswith('rand'):
-            tfl += [rand_augment_transform(auto_augment, aa_params)]
-        elif auto_augment.startswith('augmix'):
-            aa_params['translate_pct'] = 0.3
-            tfl += [augment_and_mix_transform(auto_augment, aa_params)]
-        else:
-            tfl += [auto_augment_transform(auto_augment, aa_params)]
-    elif color_jitter is not None:
-        # color jitter is enabled when not using AA
-        if isinstance(color_jitter, (list, tuple)):
-            # color jitter should be a 3-tuple/list if spec brightness/contrast/saturation
-            # or 4 if also augmenting hue
-            assert len(color_jitter) in (3, 4)
-        else:
-            # if it's a scalar, duplicate for brightness, contrast, and saturation, no hue
-            color_jitter = (float(color_jitter),) * 3
-        tfl += [transforms.ColorJitter(*color_jitter)]
-
-    if ten_crop:
-        tfl += [transforms.TenCrop(size=crop_size)]
-        if use_prefetcher:
-            # prefetcher and collate will handle tensor conversion and norm
-            tfl += [transforms.Lambda(lambda crops: [ToNumpy()(crop) for crop in crops])]
-        else:
-            tfl += [
-                transforms.Lambda(lambda crops: [transforms.ToTensor()(crop) for crop in crops]),
-                transforms.Lambda(lambda crops: [transforms.Normalize(mean=torch.tensor(mean), std=torch.tensor(std))(crop) for crop in crops]),
-                transforms.Lambda(lambda crops: torch.stack(crops)),
-            ]
-            # if re_prob > 0.:
-            #     tfl += [
-            #         RandomErasing(re_prob, mode=re_mode, max_count=re_count, num_splits=re_num_splits, device='cpu')]
-    else:
-        tfl += [transforms.CenterCrop(size=crop_size)]
-        if use_prefetcher:
-            # prefetcher and collate will handle tensor conversion and norm
-            tfl += [ToNumpy()]
-        else:
-            tfl += [
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=torch.tensor(mean),
-                    std=torch.tensor(std))
-            ]
-            # if re_prob > 0.:
-            #     tfl += [
-            #         RandomErasing(re_prob, mode=re_mode, max_count=re_count, num_splits=re_num_splits, device='cpu')]
-    return transforms.Compose(tfl)
-
 def transform_customized_inference(
         img_size=400,
-        hflip=None,
-        vflip=None,
+        hflip=0.,
+        vflip=0.,
         color_jitter=None,
         auto_augment=None,
         interpolation='bilinear',
         use_prefetcher=False,
         mean=IMAGENET_DEFAULT_MEAN,
         std=IMAGENET_DEFAULT_STD,
-        # re_prob=0.,
-        # re_mode='const',
-        # re_count=1,
-        # re_num_splits=0,
         crop_pct=0.4,
 ):
     if interpolation == 'random':
@@ -436,4 +238,85 @@ def transform_customized_inference(
 
     return transforms.Compose(tfl)
 
+def create_transform(
+        input_size,
+        is_training=False,
+        use_prefetcher=False,
+        no_aug=False,
+        scale=None,
+        ratio=None,
+        hflip=0.5,
+        vflip=0.,
+        color_jitter=0.4,
+        auto_augment=None,
+        interpolation='bilinear',
+        mean=IMAGENET_DEFAULT_MEAN,
+        std=IMAGENET_DEFAULT_STD,
+        re_prob=0.,
+        re_mode='const',
+        re_count=1,
+        re_num_splits=0,
+        crop_pct=None,
+        tf_preprocessing=False,
+        separate=False,
+        is_anti_spoofing=False):
 
+    if isinstance(input_size, (tuple, list)):
+        img_size = input_size[-2:]
+    else:
+        img_size = input_size
+
+    if tf_preprocessing and use_prefetcher:
+        assert not separate, "Separate transforms not supported for TF preprocessing"
+        from timm.data.tf_preprocessing import TfPreprocessTransform
+        transform = TfPreprocessTransform(
+            is_training=is_training, size=img_size, interpolation=interpolation)
+    else:
+        if is_anti_spoofing:
+            assert not separate, "Separate transforms not supported for validation preprocessing"
+            transform = transform_customized_inference(
+                img_size,
+                interpolation=interpolation,
+                use_prefetcher=use_prefetcher,
+                mean=mean,
+                std=std,
+                crop_pct=crop_pct,
+                
+            )
+        elif is_training and no_aug:
+            assert not separate, "Cannot perform split augmentation with no_aug"
+            transform = transforms_noaug_train(
+                img_size,
+                interpolation=interpolation,
+                use_prefetcher=use_prefetcher,
+                mean=mean,
+                std=std)
+        elif is_training:
+            transform = transforms_imagenet_train(
+                img_size,
+                scale=scale,
+                ratio=ratio,
+                hflip=hflip,
+                vflip=vflip,
+                color_jitter=color_jitter,
+                auto_augment=auto_augment,
+                interpolation=interpolation,
+                use_prefetcher=use_prefetcher,
+                mean=mean,
+                std=std,
+                re_prob=re_prob,
+                re_mode=re_mode,
+                re_count=re_count,
+                re_num_splits=re_num_splits,
+                separate=separate)
+        else:
+            assert not separate, "Separate transforms not supported for validation preprocessing"
+            transform = transforms_imagenet_eval(
+                img_size,
+                interpolation=interpolation,
+                use_prefetcher=use_prefetcher,
+                mean=mean,
+                std=std,
+                crop_pct=crop_pct)
+
+    return transform

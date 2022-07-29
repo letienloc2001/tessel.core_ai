@@ -4,8 +4,8 @@ import json
 from flask import Blueprint, request, current_app
 from flask.wrappers import Response
 
-from app.services.quality_image import ImageQuality
-from app.utils.read_images import convert_from_base64, read_images_from_path
+from tessel.app.services.quality_image import ImageQuality
+from tessel.app.utils.read_images import convert_from_base64, read_images_from_path
 
 quality_image_bp = Blueprint('quality_image_bp', __name__)
 
